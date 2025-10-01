@@ -196,9 +196,13 @@
   </div>
 
   <script>
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    let audioCtx, analyser;
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+  let audioCtx, analyser;
+
+  // Variables globales de volumen
+  let micVolume = 200.0;       // Volumen del micro (ej: 0.5 = menos, 2.0 = más fuerte)
+  let internalVolume = 0.7;  // Volumen de osciladores internos
 
     const notas = {
       "C": 2*261.63, "Eb": 2*311.13,
@@ -235,7 +239,12 @@
       const source = audioCtx.createMediaStreamSource(stream);
       analyser = audioCtx.createAnalyser();
       analyser.fftSize = 8192;
-      source.connect(analyser);
+
+      // NUEVO: control de volumen del micro
+      const micGain = audioCtx.createGain();
+      micGain.gain.value = micVolume;
+      source.connect(micGain);
+      micGain.connect(analyser);
 
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       const binWidth = audioCtx.sampleRate / analyser.fftSize;
@@ -279,6 +288,7 @@
       melodia.forEach(([nota, dur]) => {
         let osc = audioCtx.createOscillator();
         let gain = audioCtx.createGain();
+        gain.gain.value = internalVolume; // volumen de nota interna
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         gain.connect(analyser);
@@ -303,31 +313,32 @@
       });
     }
 	
-	function playNote(nota) {
-	  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playNote(nota) {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-	  let osc = audioCtx.createOscillator();
-	  let gain = audioCtx.createGain();
-	  osc.connect(gain);
-	  gain.connect(audioCtx.destination);
-	  if (analyser) gain.connect(analyser);
+      let osc = audioCtx.createOscillator();
+      let gain = audioCtx.createGain();
+      gain.gain.value = internalVolume; // volumen de nota interna
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      if (analyser) gain.connect(analyser);
 
-	  osc.type = "sine";
-	  osc.frequency.value = notas[nota];
-	  osc.start();
-	  osc.stop(audioCtx.currentTime + 0.8); // duración de ~0.8s
+      osc.type = "sine";
+      osc.frequency.value = notas[nota];
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.8); // duración de ~0.8s
 
-	  // Animar bombilla correspondiente
-	  const b = bombillas[nota];
-	  if (b) {
-		b.classList.add("active");
-		b.style.background = getColor(nota);
-		setTimeout(() => {
-		  b.classList.remove("active");
-		  b.style.background = "radial-gradient(circle, #111 40%, #000 100%)";
-		}, 800);
-	  }
-	}
+      // Animar bombilla correspondiente
+      const b = bombillas[nota];
+      if (b) {
+        b.classList.add("active");
+        b.style.background = getColor(nota);
+        setTimeout(() => {
+          b.classList.remove("active");
+          b.style.background = "radial-gradient(circle, #111 40%, #000 100%)";
+        }, 800);
+      }
+    }
 
     // 🎵 Música de fondo independiente
     const backgroundSong = new Audio("blinding.mp3");
